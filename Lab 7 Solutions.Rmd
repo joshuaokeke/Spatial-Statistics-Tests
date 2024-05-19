@@ -1,0 +1,323 @@
+---
+title: "*Spatial Statistics Lab 7*"
+author: '**Onyedikachi J Okeke**'
+date: "`r Sys.Date()`"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### **0.0 To Load the library**
+```{r,comment="",echo=TRUE,eval=FALSE}
+library(sp)
+library(spatstat)
+library(sf)
+library(spatstat.geom)
+library(ctv)
+library(terra)
+library(spdep)
+library(rgdal)
+library(rgdal)
+library(terra)
+library(RColorBrewer)
+library(classInt)
+library(epitools)
+library(DCluster)
+
+```
+##### Library
+```{r,echo=F,results='Show', fig.show='hold',eval=T}
+library(sp)
+library(spatstat)
+library(sf)
+library(spatstat.geom)
+library(ctv)
+library(terra)
+library(spdep)
+library(rgdal)
+library(rgdal)
+library(terra)
+library(RColorBrewer)
+library(classInt)
+library(epitools)
+library(DCluster)
+
+```
+
+### **Q1 Loading Sids data**
+```{r,comment="",echo=TRUE,eval=FALSE}
+data(nc.sids)
+sids<-data.frame(Observed=nc.sids$SID74)
+#combine the expected number of SID cases to the data frame
+sids<-cbind(sids, Expected=nc.sids$BIR74*sum(nc.sids$SID74)/sum(nc.sids$BIR74))
+#combine x, y coordinates to the data frame
+sids<-cbind(sids, x=nc.sids$x, y=nc.sids$y)
+
+```
+##### Result
+```{r echo=FALSE, results='show', fig.show='hold', eval=TRUE, warning=FALSE, fig.width=6, fig.height=4}
+data(nc.sids)
+sids<-data.frame(Observed=nc.sids$SID74)
+#combine the expected number of SID cases to the data frame
+sids<-cbind(sids, Expected=nc.sids$BIR74*sum(nc.sids$SID74)/sum(nc.sids$BIR74))
+#combine x, y coordinates to the data frame
+sids<-cbind(sids, x=nc.sids$x, y=nc.sids$y)
+
+```
+
+### **GAM using the centroids of the areas in data**
+```{r,comment="",echo=TRUE,eval=FALSE}
+#step is the step of the grid, alpha is the Significance level of the tests performed.
+sidsgam<-opgam(data=sids, radius=30, step=10, alpha=.002)
+
+#Plot centroids
+plot(sids$x, sids$y, xlab="Easting", ylab="Northing")
+#Plot points marked as clusters
+points(sidsgam$x, sidsgam$y, col="red", pch="*")
+title("Alpha level = 0.002")
+
+#Change the alpha (Significance level of the tests performed) to 0.05 and rerun the GAM
+sidsgam05<-opgam(data=sids, radius=30, step=10, alpha=.05)
+
+#Plot centroids
+plot(sids$x, sids$y, xlab="Easting", ylab="Northing")
+#Plot points marked as clusters
+points(sidsgam05$x, sidsgam05$y, col="red", pch="*")
+title("Alpha level = 0.05")
+
+```
+##### Result
+```{r echo=FALSE, results='show', fig.show='hold', eval=TRUE, warning=FALSE, fig.width=6, fig.height=4}
+#step is the step of the grid, alpha is the Significance level of the tests performed.
+sidsgam<-opgam(data=sids, radius=30, step=10, alpha=.002)
+
+#Plot centroids
+plot(sids$x, sids$y, xlab="Easting", ylab="Northing")
+#Plot points marked as clusters
+points(sidsgam$x, sidsgam$y, col="red", pch="*")
+title("Alpha level = 0.002")
+
+#Change the alpha (Significance level of the tests performed) to 0.05 and rerun the GAM
+sidsgam05<-opgam(data=sids, radius=30, step=10, alpha=.05)
+
+#Plot centroids
+plot(sids$x, sids$y, xlab="Easting", ylab="Northing")
+#Plot points marked as clusters
+points(sidsgam05$x, sidsgam05$y, col="red", pch="*")
+title("Alpha level = 0.05")
+
+```
+
+Q1. Describe the pattern
+Q2. Change the alpha (Significance level of the tests performed) to 0.05 and rerun the GAM. Describe the differences between it and pattern from Q1.
+
+### **Kulldorff’s spatial scan statistics**
+```{r,comment="",echo=TRUE,eval=FALSE}
+sids<-data.frame(Observed=nc.sids$SID74)
+sids<-cbind(sids, Expected=nc.sids$BIR74*sum(nc.sids$SID74)/sum(nc.sids$BIR74))
+#combine risk population, and x, y coordinates to the data frame
+sids<-cbind(sids, Population=nc.sids$BIR74, x=nc.sids$x, y=nc.sids$y)
+# Kulldorff’s spatial scan statistics method over the centroids
+# there are different models and here we use negative binomial
+mle<-calculate.mle(sids, model="negbin") # Calculate parameters in sampling procedures
+
+knresults<-opgam(data=sids, thegrid=sids[,c("x","y")], alpha=.05,
+iscluster=kn.iscluster, fractpop=.15, R=99, model="negbin", mle=mle)
+#Plot all centroids and significant ones in red
+
+plot(sids$x, sids$y, main="Kulldorff and Nagarwalla's method, Fractpop = 0.15")
+points(knresults$x, knresults$y, col="red", pch=19)
+
+#Plot the cluster with the highest likelihood ratio test in green
+clusters<-get.knclusters(sids, knresults)
+idx<-which.max(knresults$statistic)
+points(sids$x[clusters[[idx]]], sids$y[clusters[[idx]]], col="green", pch=19)
+
+
+#Change the maximum fraction of the total population to 0.5 and rerun the test
+knresults05<-opgam(data=sids, thegrid=sids[,c("x","y")], alpha=.05,
+iscluster=kn.iscluster, fractpop=.5, R=99, model="negbin", mle=mle)
+
+#Plot all centroids and significant ones in red
+plot(sids$x, sids$y, main="Kulldorff and Nagarwalla's method, Fractpop = 0.5")
+points(knresults05$x, knresults05$y, col="red", pch=19)
+
+#Plot the cluster with the highest likelihood ratio test in green
+clusters<-get.knclusters(sids, knresults05)
+idx<-which.max(knresults05$statistic)
+points(sids$x[clusters[[idx]]], sids$y[clusters[[idx]]], col="green", pch=19)
+
+```
+##### Result
+```{r echo=FALSE, results='show', fig.show='hold', eval=TRUE, warning=FALSE, fig.width=6, fig.height=4}
+sids<-data.frame(Observed=nc.sids$SID74)
+sids<-cbind(sids, Expected=nc.sids$BIR74*sum(nc.sids$SID74)/sum(nc.sids$BIR74))
+#combine risk population, and x, y coordinates to the data frame
+sids<-cbind(sids, Population=nc.sids$BIR74, x=nc.sids$x, y=nc.sids$y)
+# Kulldorff’s spatial scan statistics method over the centroids
+# there are different models and here we use negative binomial
+mle<-calculate.mle(sids, model="negbin") # Calculate parameters in sampling procedures
+
+knresults<-opgam(data=sids, thegrid=sids[,c("x","y")], alpha=.05,
+iscluster=kn.iscluster, fractpop=.15, R=99, model="negbin", mle=mle)
+#Plot all centroids and significant ones in red
+
+plot(sids$x, sids$y, main="Kulldorff and Nagarwalla's method, Fractpop = 0.15")
+points(knresults$x, knresults$y, col="red", pch=19)
+
+#Plot the cluster with the highest likelihood ratio test in green
+clusters<-get.knclusters(sids, knresults)
+idx<-which.max(knresults$statistic)
+points(sids$x[clusters[[idx]]], sids$y[clusters[[idx]]], col="green", pch=19)
+
+
+#Change the maximum fraction of the total population to 0.5 and rerun the test
+knresults05<-opgam(data=sids, thegrid=sids[,c("x","y")], alpha=.05,
+iscluster=kn.iscluster, fractpop=.5, R=99, model="negbin", mle=mle)
+
+#Plot all centroids and significant ones in red
+plot(sids$x, sids$y, main="Kulldorff and Nagarwalla's method, Fractpop = 0.5")
+points(knresults05$x, knresults05$y, col="red", pch=19)
+
+#Plot the cluster with the highest likelihood ratio test in green
+clusters<-get.knclusters(sids, knresults05)
+idx<-which.max(knresults05$statistic)
+points(sids$x[clusters[[idx]]], sids$y[clusters[[idx]]], col="green", pch=19)
+
+
+```
+
+Q3. Describe the pattern. 
+Q4. Change the maximum fraction of the total population to 0.5 and rerun the test. Take a screenshot of the results. Describe the differences between it and pattern from Q3. (15 points)
+
+### **Besag and Newell's Statistic for Spatial Clustering**
+```{r,comment="",echo=TRUE,eval=FALSE}
+sids<-data.frame(Observed=nc.sids$SID74)
+sids<-cbind(sids, Expected=nc.sids$BIR74*sum(nc.sids$SID74)/sum(nc.sids$BIR74))
+sids<-cbind(sids, x=nc.sids$x, y=nc.sids$y)
+
+#Where K = 10
+bnresults10<-opgam(sids, thegrid=sids[,c("x","y")], alpha=.05,
+iscluster=bn.iscluster, set.idxorder=TRUE, k=10, model="poisson",
+R=100, mle=calculate.mle(sids) )
+#Plot all the centroids
+plot(sids$x, sids$y)
+#Plot significant centroids in red
+points(bnresults10$x, bnresults10$y, col="red", pch=19)
+title("Besag and Newell’s test, K = 10")
+
+#Where K = 20
+bnresults20<-opgam(sids, thegrid=sids[,c("x","y")], alpha=.05,
+iscluster=bn.iscluster, set.idxorder=TRUE, k=20, model="poisson",
+R=100, mle=calculate.mle(sids) )
+#Plot all the centroids
+plot(sids$x, sids$y)
+#Plot significant centroids in red
+points(bnresults20$x, bnresults20$y, col="red", pch=19)
+title("Besag and Newell’s test, K = 20")
+
+#Where K = 30
+bnresults30<-opgam(sids, thegrid=sids[,c("x","y")], alpha=.05,
+iscluster=bn.iscluster, set.idxorder=TRUE, k=30, model="poisson",
+R=100, mle=calculate.mle(sids) )
+#Plot all the centroids
+plot(sids$x, sids$y)
+#Plot significant centroids in red
+points(bnresults30$x, bnresults30$y, col="red", pch=19)
+title("Besag and Newell’s test, K = 30")
+
+#Where K = 40
+bnresults40<-opgam(sids, thegrid=sids[,c("x","y")], alpha=.05,
+iscluster=bn.iscluster, set.idxorder=TRUE, k=40, model="poisson",
+R=100, mle=calculate.mle(sids) )
+#Plot all the centroids
+plot(sids$x, sids$y)
+#Plot significant centroids in red
+points(bnresults40$x, bnresults40$y, col="red", pch=19)
+title("Besag and Newell’s test, K = 40")
+
+```
+##### Result
+```{r echo=FALSE, results='show', fig.show='hold', eval=TRUE, warning=FALSE, fig.width=6, fig.height=4}
+sids<-data.frame(Observed=nc.sids$SID74)
+sids<-cbind(sids, Expected=nc.sids$BIR74*sum(nc.sids$SID74)/sum(nc.sids$BIR74))
+sids<-cbind(sids, x=nc.sids$x, y=nc.sids$y)
+
+#Where K = 10
+bnresults10<-opgam(sids, thegrid=sids[,c("x","y")], alpha=.05,
+iscluster=bn.iscluster, set.idxorder=TRUE, k=10, model="poisson",
+R=100, mle=calculate.mle(sids) )
+#Plot all the centroids
+plot(sids$x, sids$y)
+#Plot significant centroids in red
+points(bnresults10$x, bnresults10$y, col="red", pch=19)
+title("Besag and Newell’s test, K = 10")
+
+#Where K = 20
+bnresults20<-opgam(sids, thegrid=sids[,c("x","y")], alpha=.05,
+iscluster=bn.iscluster, set.idxorder=TRUE, k=20, model="poisson",
+R=100, mle=calculate.mle(sids) )
+#Plot all the centroids
+plot(sids$x, sids$y)
+#Plot significant centroids in red
+points(bnresults20$x, bnresults20$y, col="red", pch=19)
+title("Besag and Newell’s test, K = 20")
+
+#Where K = 30
+bnresults30<-opgam(sids, thegrid=sids[,c("x","y")], alpha=.05,
+iscluster=bn.iscluster, set.idxorder=TRUE, k=30, model="poisson",
+R=100, mle=calculate.mle(sids) )
+#Plot all the centroids
+plot(sids$x, sids$y)
+#Plot significant centroids in red
+points(bnresults30$x, bnresults30$y, col="red", pch=19)
+title("Besag and Newell’s test, K = 30")
+
+#Where K = 40
+bnresults40<-opgam(sids, thegrid=sids[,c("x","y")], alpha=.05,
+iscluster=bn.iscluster, set.idxorder=TRUE, k=40, model="poisson",
+R=100, mle=calculate.mle(sids) )
+#Plot all the centroids
+plot(sids$x, sids$y)
+#Plot significant centroids in red
+points(bnresults40$x, bnresults40$y, col="red", pch=19)
+title("Besag and Newell’s test, K = 40")
+
+
+```
+
+Q5. Take a screenshot of the results. Describe the pattern. 
+Q6. Change the k (e.g. 10, 30) and rerun the Besag and Newell’s test. Take a screen shot of each plot. Compare these patterns against that from Q3.
+
+### **Stone test**
+```{r,comment="",echo=TRUE,eval=FALSE}
+sids<-data.frame(Observed=nc.sids$SID74)
+sids<-cbind(sids, Expected=nc.sids$BIR74*sum(nc.sids$SID74)/sum(nc.sids$BIR74))
+sids<-cbind(sids, x=nc.sids$x, y=nc.sids$y)
+#Compute Stone's statistic around a county
+region<-which(row.names(nc.sids)=="Robeson")
+stone.stat(sids, region=region, lambda=1)
+stone.test(Observed~offset(log(Expected)), sids, model="poisson", R=99,
+region=region, lambda=1)
+
+```
+##### Result
+```{r echo=FALSE, results='show', fig.show='hold', eval=TRUE, warning=FALSE, fig.width=6, fig.height=4}
+sids<-data.frame(Observed=nc.sids$SID74)
+sids<-cbind(sids, Expected=nc.sids$BIR74*sum(nc.sids$SID74)/sum(nc.sids$BIR74))
+sids<-cbind(sids, x=nc.sids$x, y=nc.sids$y)
+#Compute Stone's statistic around a county
+region<-which(row.names(nc.sids)=="Robeson")
+stone.stat(sids, region=region, lambda=1)
+stone.test(Observed~offset(log(Expected)), sids, model="poisson", R=99,
+region=region, lambda=1)
+
+```
+
+Q7. What is the pattern of this county? 
+Q8. Compare results generated from the above three methods and those from local Getis G* and local moran’s I (in Lab 6). Explain the differences if any.
